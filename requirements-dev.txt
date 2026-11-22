@@ -1,0 +1,7 @@
+# Test and lint tools — used locally and in CI, never installed on App Service.
+#   pip install -r requirements.txt -r requirements-dev.txt
+
+pytest>=8.0
+# Pinned: new ruff releases change the default rules, which would fail CI
+# without any code change. Bump deliberately.
+ruff==0.17.6

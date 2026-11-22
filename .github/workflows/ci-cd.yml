@@ -1,0 +1,107 @@
+# SpeakBuddy CI/CD
+#
+#   Pull request to main  →  lint + tests (nothing is deployed)
+#   Push to main          →  lint + tests → deploy to Azure App Service → live health check
+#
+# The deploy job stays skipped until Azure is set up and the repository
+# variable AZURE_WEBAPP_NAME exists. See "Deploying to Azure" in README.md.
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # "Run workflow" button, e.g. to redeploy after rotating a key
+
+permissions:
+  contents: read
+
+# PR runs replace each other; main runs queue so a deploy is never cut off midway.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Lint & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12" # keep in step with the App Service runtime
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: python -m pytest
+
+      # Ship exactly the code that was tested. App Service installs
+      # requirements.txt itself during deployment, so no virtualenv goes in.
+      - name: Package app
+        run: zip -r app.zip backend frontend requirements.txt -x '*__pycache__*'
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app
+          path: app.zip
+          retention-days: 7
+
+  deploy:
+    name: Deploy to Azure App Service
+    needs: test
+    if: >-
+      github.event_name != 'pull_request' &&
+      github.ref == 'refs/heads/main' &&
+      vars.AZURE_WEBAPP_NAME != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net
+    permissions:
+      contents: read
+      id-token: write # lets azure/login sign in with OIDC; no Azure password is stored
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: app
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: app.zip
+          startup-command: python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+      - name: Check the live site
+        env:
+          HEALTH_URL: https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net/health
+        run: |
+          # The first start installs dependencies, and Free-tier apps sleep when
+          # idle, so allow up to 5 minutes before calling it a failure.
+          for attempt in $(seq 1 30); do
+            if curl -fsS --max-time 20 "$HEALTH_URL" | grep -q '"status":"ok"'; then
+              echo "Live and healthy: $HEALTH_URL"
+              exit 0
+            fi
+            echo "Attempt $attempt/30: not ready yet, retrying in 10s"
+            sleep 10
+          done
+          echo "::error::$HEALTH_URL did not report healthy within 5 minutes. Check Log stream in the Azure portal; a missing API key stops the app at startup."
+          exit 1
