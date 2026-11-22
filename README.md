@@ -104,8 +104,12 @@ Switching providers is one line in `.env` plus a restart — no code changes.
 │   ├── index.html
 │   ├── styles.css          Mobile-first, breakpoints at 480/768/1024/1280px
 │   └── app.js              Speech recognition, TTS, chat, state machine
+├── tests/                  Smoke tests (fake keys, stub provider — no real API calls)
+├── .github/workflows/
+│   └── ci-cd.yml           Lint + test on every PR; deploy to Azure on push to main
 ├── .env.example
 ├── requirements.txt
+├── requirements-dev.txt    pytest + ruff (CI and local only)
 └── README.md
 ```
 
@@ -246,6 +250,107 @@ mic button pauses the whole loop.
 
 ---
 
+## Tests
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+ruff check .
+python -m pytest
+```
+
+The tests use fake credentials and a stub provider, so they need no `.env` and
+never call a real API.
+
+---
+
+## Deploying to Azure
+
+[`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) runs on GitHub Actions:
+
+| Trigger | What runs |
+| --- | --- |
+| Pull request to `main` | Lint + tests. Nothing is deployed. |
+| Push to `main` | Lint + tests → deploy to Azure App Service → wait for `/health` on the live site |
+| **Run workflow** button | Same as a push, e.g. to redeploy on demand |
+
+If lint or tests fail, the run stops before deploying and the live site keeps
+the last good version. The deploy job is **skipped** until the one-time setup
+below is done.
+
+### One-time setup
+
+Run these in **Azure Cloud Shell (Bash)** from the portal — it is already signed
+in to the account you opened the portal with. `<app-name>` must be globally
+unique; it becomes `https://<app-name>.azurewebsites.net`.
+
+**1. Create the App Service** (Linux, Python 3.12; the Free F1 plan is enough to start)
+
+```bash
+az group create --name rg-speakbuddy-prod --location <region>
+az appservice plan create --name asp-speakbuddy-prod --resource-group rg-speakbuddy-prod --sku F1 --is-linux
+az webapp create --name <app-name> --resource-group rg-speakbuddy-prod --plan asp-speakbuddy-prod --runtime "PYTHON:3.12"
+az webapp update --name <app-name> --resource-group rg-speakbuddy-prod --https-only true
+```
+
+**2. Add the app settings** in the portal: *App Service → Settings → Environment
+variables*. Use the same variables as your `.env`, plus one more:
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| `SCM_DO_BUILD_DURING_DEPLOYMENT` | `true` | Azure installs `requirements.txt` on each deploy |
+| `LLM_PROVIDER` and that provider's key | e.g. `openai` + `OPENAI_API_KEY` | The app refuses to start without them |
+
+Enter keys in the portal rather than with `az … --settings`, so they never land
+in shell history. The pipeline never touches app settings, so keys never pass
+through GitHub.
+
+**3. Let GitHub Actions sign in to Azure** with OIDC — no password is stored anywhere.
+
+```bash
+APP_ID=$(az ad app create --display-name speakbuddy-github --query appId -o tsv)
+az ad sp create --id $APP_ID
+
+cat > credential.json <<'EOF'
+{
+  "name": "github-production",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:tatireddymohan01/speakbuddy:environment:production",
+  "audiences": ["api://AzureADTokenExchange"]
+}
+EOF
+az ad app federated-credential create --id $APP_ID --parameters credential.json
+
+WEBAPP_ID=$(az webapp show --name <app-name> --resource-group rg-speakbuddy-prod --query id -o tsv)
+az role assignment create --assignee $APP_ID --role "Website Contributor" --scope $WEBAPP_ID
+
+echo "AZURE_CLIENT_ID=$APP_ID"
+az account show --query "{AZURE_TENANT_ID:tenantId, AZURE_SUBSCRIPTION_ID:id}" -o yaml
+```
+
+The role is limited to this one web app. The `subject` must match exactly: the
+deploy job runs in the GitHub environment named `production`.
+
+**4. Add them to GitHub**: *repo → Settings → Secrets and variables → Actions*
+
+| Name | Type | Value |
+| --- | --- | --- |
+| `AZURE_CLIENT_ID` | Secret | from step 3 |
+| `AZURE_TENANT_ID` | Secret | from step 3 |
+| `AZURE_SUBSCRIPTION_ID` | Secret | from step 3 |
+| `AZURE_WEBAPP_NAME` | **Variable** | `<app-name>` — setting this switches the deploy job on |
+
+Then open *Actions → CI/CD → Run workflow*, or push to `main`.
+
+### Day to day
+
+| Task | How |
+| --- | --- |
+| Ship a change | Push to `main` (or merge a PR) — tested and deployed automatically |
+| Change a setting or rotate a key | Edit it under *Environment variables* in the portal; the app restarts itself |
+| Roll back | `git revert <commit>` and push |
+
+---
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -256,3 +361,6 @@ mic button pauses the whole loop.
 | Azure calls fail | Check `AZURE_OPENAI_DEPLOYMENT` is the *deployment* name, and that the endpoint has no trailing slash |
 | Tutor replies get cut off | Raise `MAX_TOKENS` in `.env` |
 | Server logs a 401 from the provider | The API key was rejected — check `.env` and restart |
+| Deploy job shows as skipped | The `AZURE_WEBAPP_NAME` repository variable isn't set yet |
+| Azure login fails: *no matching federated identity record* | The credential `subject` must be exactly `repo:tatireddymohan01/speakbuddy:environment:production` |
+| Deploy succeeds but the health check times out | Open *Log stream* in the portal — usually a missing provider key, or `SCM_DO_BUILD_DURING_DEPLOYMENT` not set |
