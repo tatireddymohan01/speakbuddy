@@ -1,0 +1,3 @@
+# Keep LF everywhere: the app deploys to Linux App Service, and mixed
+# endings were already the cause of one garbled .env.
+* text=auto eol=lf

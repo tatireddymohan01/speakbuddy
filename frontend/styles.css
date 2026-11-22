@@ -1,0 +1,603 @@
+/* ==========================================================================
+   SpeakBuddy — mobile-first stylesheet
+   Breakpoints: 480px phone-large · 768px tablet · 1024px laptop · 1280px desktop
+   ========================================================================== */
+
+:root {
+  --bg:            #f4f5fb;
+  --surface:       #ffffff;
+  --surface-2:     #f0f1f8;
+  --border:        #e2e4f0;
+  --text:          #191a24;
+  --text-soft:     #5f6274;
+  --text-faint:    #8b8fa3;
+
+  --accent:        #4f46e5;
+  --accent-strong: #4338ca;
+  --accent-soft:   #eef0ff;
+  --on-accent:     #ffffff;
+
+  --user-bubble:   #4f46e5;
+  --user-text:     #ffffff;
+  --tutor-bubble:  #ffffff;
+  --tutor-text:    #191a24;
+
+  --listen:        #16a34a;
+  --think:         #d97706;
+  --speak:         #2563eb;
+  --danger:        #dc2626;
+  --danger-soft:   #fef2f2;
+
+  --radius:        14px;
+  --radius-lg:     20px;
+  --shadow:        0 1px 2px rgba(20, 22, 40, .06), 0 6px 18px rgba(20, 22, 40, .07);
+
+  --gutter:        14px;
+  --tap:           44px;   /* minimum touch target */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:          #0e0f16;
+    --surface:     #171923;
+    --surface-2:   #1e2130;
+    --border:      #2a2e40;
+    --text:        #eceef7;
+    --text-soft:   #a3a8bd;
+    --text-faint:  #757a91;
+
+    --accent:      #7c74f5;
+    --accent-strong: #6b62ee;
+    --accent-soft: #232544;
+
+    --user-bubble: #5b52e8;
+    --tutor-bubble:#1e2130;
+    --tutor-text:  #eceef7;
+
+    --danger:      #f87171;
+    --danger-soft: #2a1717;
+
+    --shadow:      0 1px 2px rgba(0, 0, 0, .4), 0 6px 18px rgba(0, 0, 0, .35);
+  }
+}
+
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;              /* only the transcript scrolls */
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+button, input { font: inherit; color: inherit; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ── App shell ───────────────────────────────────────────────────────────── */
+
+.app {
+  height: 100vh;
+  height: 100dvh;                /* survives mobile browser chrome */
+  /* Flex column, not grid rows: the error banner is display:none until it is
+     needed, and a grid would then shift every later child up a track — which
+     handed the spare space to the composer instead of the transcript. */
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+  margin: 0 auto;
+  background: var(--bg);
+}
+
+/* Only the transcript grows; every other band is its own height. */
+.topbar,
+.statusbar,
+.error-banner,
+.composer { flex: 0 0 auto; }
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px var(--gutter);
+  padding-top: max(10px, env(safe-area-inset-top));
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  /* Three modes don't fit beside the brand on a phone, so the toggle drops
+     onto its own row until there is room for one line. */
+  flex-wrap: wrap;
+}
+
+.brand { display: flex; align-items: center; gap: 7px; min-width: 0; order: 1; }
+.brand-mark { font-size: 20px; line-height: 1; }
+.brand-name {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+}
+
+/* Hide the wordmark on the narrowest phones so the controls always fit. */
+@media (max-width: 359px) { .brand-name { display: none; } }
+
+/* Mode toggle -------------------------------------------------------------- */
+
+.mode-toggle {
+  /* Phone: full-width second row, three equal segments. */
+  order: 3;
+  flex: 1 0 100%;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+
+.mode-btn {
+  flex: 1 1 0;                   /* equal widths on the phone row */
+  /* Without this, `white-space: nowrap` sets an automatic minimum equal to the
+     text width, so three buttons cannot shrink and push the page wider than a
+     320px screen. */
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  padding: 8px 6px;
+  min-height: 38px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background .18s, color .18s;
+}
+.mode-btn:hover { color: var(--text); }
+.mode-btn.is-active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(20, 22, 40, .12);
+}
+
+.mode-full { display: none; }
+.mode-short { display: inline; }
+
+/* Mic button --------------------------------------------------------------- */
+
+.mic-btn {
+  order: 2;
+  margin-left: auto;             /* pushed to the right of the brand */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .18s, transform .1s;
+}
+.mic-btn:active { transform: scale(.96); }
+.mic-btn[aria-pressed="true"] { background: var(--listen); }
+.mic-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.mic-btn .ico { width: 20px; height: 20px; fill: currentColor; flex: none; }
+.mic-btn .ico-off { display: block; }
+.mic-btn .ico-on  { display: none; }
+.mic-btn[aria-pressed="true"] .ico-off { display: none; }
+.mic-btn[aria-pressed="true"] .ico-on  { display: block; }
+
+.mic-label { display: none; }
+
+/* ── Status pill ─────────────────────────────────────────────────────────── */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px var(--gutter) 4px;
+}
+
+/* Accent picker — sits beside the status pill. */
+.accent-picker {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;                  /* allow shrinking rather than overflowing */
+  gap: 5px;
+  padding: 0 10px 0 9px;
+  min-height: 34px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  color: var(--text-soft);
+  cursor: pointer;
+}
+.accent-picker:focus-within { border-color: var(--accent); }
+.accent-picker svg { width: 15px; height: 15px; fill: currentColor; flex: none; opacity: .75; }
+
+.accent-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 2px;
+  max-width: 9.5em;
+  cursor: pointer;
+  outline: none;
+  text-overflow: ellipsis;
+}
+/* The dropdown list itself is drawn by the OS, so it needs real colours. */
+.accent-select option { background: var(--surface); color: var(--text); }
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+  transition: color .2s, border-color .2s;
+}
+
+.status-viz { display: inline-flex; align-items: center; gap: 3px; height: 14px; }
+.status-viz i {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: .45;
+}
+
+/* Idle — three flat dots. */
+.status-pill.is-idle { color: var(--text-faint); }
+
+/* Listening — pulsing ring. */
+.status-pill.is-listening { color: var(--listen); border-color: color-mix(in srgb, var(--listen) 35%, var(--border)); }
+.status-pill.is-listening .status-viz i:nth-child(2) {
+  width: 10px; height: 10px; opacity: 1;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.status-pill.is-listening .status-viz i:nth-child(1),
+.status-pill.is-listening .status-viz i:nth-child(3) { display: none; }
+
+@keyframes pulse {
+  0%, 100% { transform: scale(.7); opacity: .55; }
+  50%      { transform: scale(1);  opacity: 1; }
+}
+
+/* Thinking — travelling dots. */
+.status-pill.is-thinking { color: var(--think); border-color: color-mix(in srgb, var(--think) 35%, var(--border)); }
+.status-pill.is-thinking .status-viz i {
+  animation: bounce 1.2s ease-in-out infinite;
+}
+.status-pill.is-thinking .status-viz i:nth-child(2) { animation-delay: .15s; }
+.status-pill.is-thinking .status-viz i:nth-child(3) { animation-delay: .3s; }
+
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0);    opacity: .4; }
+  30%           { transform: translateY(-5px); opacity: 1; }
+}
+
+/* Speaking — waveform bars. */
+.status-pill.is-speaking { color: var(--speak); border-color: color-mix(in srgb, var(--speak) 35%, var(--border)); }
+.status-pill.is-speaking .status-viz i {
+  width: 3px; height: 12px; border-radius: 2px; opacity: 1;
+  animation: wave .9s ease-in-out infinite;
+}
+.status-pill.is-speaking .status-viz i:nth-child(2) { animation-delay: .18s; }
+.status-pill.is-speaking .status-viz i:nth-child(3) { animation-delay: .36s; }
+
+@keyframes wave {
+  0%, 100% { transform: scaleY(.35); }
+  50%      { transform: scaleY(1); }
+}
+
+/* Error state on the pill. */
+.status-pill.is-error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .status-viz i { animation: none !important; }
+}
+
+/* ── Error banner ────────────────────────────────────────────────────────── */
+
+.error-banner {
+  margin: 8px var(--gutter) 0;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.error-banner[hidden] { display: none; }
+
+.error-text { margin: 0; font-size: 14px; color: var(--danger); font-weight: 500; }
+.error-actions { display: flex; gap: 8px; }
+
+/* ── Transcript ──────────────────────────────────────────────────────────── */
+
+.chat {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px var(--gutter);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;                 /* lets the grid row actually shrink */
+  scroll-behavior: smooth;
+}
+
+.bubble {
+  max-width: 88%;
+  padding: 11px 14px;
+  border-radius: var(--radius-lg);
+  font-size: 15px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  /* Speech Correction replies come back as one item per line. */
+  white-space: pre-wrap;
+  animation: rise .22s ease-out;
+  box-shadow: var(--shadow);
+}
+
+/* Correction feedback is a block of teaching, so give it room and air. */
+.bubble.tutor.correction {
+  line-height: 1.7;
+  max-width: 94%;
+}
+@media (min-width: 768px) { .bubble.tutor.correction { max-width: 88%; } }
+@media (min-width: 1024px) { .bubble.tutor.correction { max-width: 82%; } }
+.bubble .lbl { font-weight: 700; color: var(--accent); }
+.bubble.user .lbl { color: inherit; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .bubble { animation: none; } }
+
+.bubble.user {
+  align-self: flex-end;
+  background: var(--user-bubble);
+  color: var(--user-text);
+  border-bottom-right-radius: 5px;
+}
+
+.bubble.tutor {
+  align-self: flex-start;
+  background: var(--tutor-bubble);
+  color: var(--tutor-text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 5px;
+}
+
+.bubble.system {
+  align-self: center;
+  max-width: 92%;
+  text-align: center;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  font-size: 13px;
+  padding: 4px 8px;
+}
+
+/* Typing indicator bubble. */
+.bubble.typing { display: flex; gap: 4px; align-items: center; padding: 14px 16px; }
+.bubble.typing span {
+  width: 7px; height: 7px; border-radius: 999px;
+  background: var(--text-faint);
+  animation: bounce 1.2s ease-in-out infinite;
+}
+.bubble.typing span:nth-child(2) { animation-delay: .15s; }
+.bubble.typing span:nth-child(3) { animation-delay: .3s; }
+
+/* ── Composer ────────────────────────────────────────────────────────────── */
+
+.composer {
+  padding: 10px var(--gutter);
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.interim {
+  margin: 0 0 8px;
+  min-height: 0;
+  font-size: 14px;
+  color: var(--text-faint);
+  font-style: italic;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.interim:empty { display: none; }
+
+.text-form { display: flex; gap: 8px; align-items: center; }
+
+.text-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--tap);
+  padding: 0 15px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;               /* ≥16px stops iOS zoom-on-focus */
+  outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+.text-input::placeholder { color: var(--text-faint); }
+.text-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 16px;
+  min-height: var(--tap);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .18s, opacity .18s, transform .1s;
+}
+.btn:active { transform: scale(.96); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-primary { background: var(--accent); color: var(--on-accent); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-strong); }
+
+.btn-ghost {
+  background: var(--surface-2);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover:not(:disabled) { color: var(--text); }
+
+.btn-sm { min-height: 34px; padding: 0 12px; font-size: 13px; }
+
+.btn-send { flex: none; width: var(--tap); padding: 0; }
+.btn-send svg { width: 18px; height: 18px; fill: currentColor; }
+
+.btn-new { flex: none; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ==========================================================================
+   Breakpoints
+   ========================================================================== */
+
+/* ── Phone, large (≥480px) ───────────────────────────────────────────────── */
+@media (min-width: 480px) {
+  :root { --gutter: 18px; }
+
+  .mic-label { display: inline; }
+  .mode-full { display: inline; }
+  .mode-short { display: none; }
+
+  .bubble { max-width: 82%; }
+  .interim { font-size: 15px; }
+}
+
+/* ── Tablet (≥768px) ─────────────────────────────────────────────────────── */
+@media (min-width: 768px) {
+  :root { --gutter: 24px; }
+
+  body { font-size: 16px; }
+
+  .topbar { padding-block: 14px; flex-wrap: nowrap; }
+  .brand-name { font-size: 18px; }
+
+  /* Room for one row again: brand · modes · mic. */
+  .mode-toggle { order: 2; flex: 0 1 auto; margin-left: auto; }
+  .mic-btn     { order: 3; margin-left: 12px; }
+  .mode-btn    { flex: 0 0 auto; font-size: 14px; padding: 9px 16px; }
+
+  .statusbar { padding-top: 14px; }
+  .status-pill { font-size: 14px; padding: 9px 20px; }
+
+  .chat { padding: 20px var(--gutter); gap: 12px; }
+  .bubble { max-width: 72%; font-size: 16px; padding: 13px 17px; }
+
+  .composer { padding-block: 14px; }
+  .hint { font-size: 13px; }
+}
+
+/* ── Laptop (≥1024px) ────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  body {
+    /* Frame the app rather than letting it stretch edge to edge. */
+    background:
+      radial-gradient(1200px 600px at 50% -10%,
+        color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
+      var(--bg);
+  }
+
+  .app {
+    max-width: 980px;
+    height: 100dvh;
+    border-inline: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .chat { padding: 26px 32px; }
+  .bubble { max-width: 66%; }
+
+  .topbar, .composer { padding-inline: 32px; }
+
+  /* Pointer devices get hover affordances that would stick on touch. */
+  .mode-btn:hover:not(.is-active) { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+}
+
+/* ── Desktop (≥1280px) ───────────────────────────────────────────────────── */
+@media (min-width: 1280px) {
+  .app { max-width: 1080px; }
+  .chat { padding: 32px 40px; }
+  .bubble { max-width: 60%; font-size: 17px; }
+  .topbar, .composer { padding-inline: 40px; }
+}
+
+/* ── Short landscape phones ──────────────────────────────────────────────── */
+@media (max-height: 480px) and (orientation: landscape) {
+  .statusbar { padding-block: 6px 2px; }
+  .hint { display: none; }
+  .chat { padding-block: 10px; }
+}
